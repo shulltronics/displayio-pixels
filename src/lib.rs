@@ -8,6 +8,7 @@ use embedded_graphics::{
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{EventLoop, ControlFlow},
+    platform::run_return::EventLoopExtRunReturn,
     window::{Window, WindowBuilder},
     dpi::LogicalSize,
 };
@@ -20,6 +21,8 @@ use pixels::{
 
 use pyo3::prelude::*;
 
+use std::sync::Arc;
+
 const BYTES_PER_PIXEL: usize = 4;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -31,7 +34,8 @@ pub enum Orientation {
 
 #[pyclass]
 pub struct PixelsDisplay {
-    //window: Window,
+    // window: Window,
+    // el: Arc<EventLoop<()>>,
     // underlying Framebuffer struct
     pixels: Pixels,
     // pixel width and height of screen
@@ -49,7 +53,7 @@ impl PixelsDisplay {
         let el = EventLoop::new();
         println!("created event loop");
 
-        let window = WindowBuilder::new()
+        let window: Window = WindowBuilder::new()
             .with_title("PixelsDisplay")
             .with_inner_size(LogicalSize::new(width, height))
             .build(&el)
@@ -87,7 +91,8 @@ impl PixelsDisplay {
         }); // event loop
 
         Self {
-            //window: window,
+            // window: window,
+            // el: Arc::new(el),
             pixels: Pixels::new(width, height, st).unwrap(),
             width: width,
             height: height,
@@ -96,6 +101,12 @@ impl PixelsDisplay {
         }
     }
 
+    // pub fn run_event_loop(&mut self) {
+    //     self.el.take().unwrap().run_return(move |event, _, control_flow| {
+    //         control_flow.set_poll();
+    //         control_flow.set_wait();
+    //     });
+    // }
 
     pub fn get_orientation(&self) -> Orientation {
         return self.orientation;

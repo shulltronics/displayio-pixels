@@ -58,6 +58,7 @@ class PixelsDisplay(displayio.Display):
 
             for area in self._subrectangles:
                 self._refresh_display_area(area)
+        self.pixels.run_event_loop()
 
 
     def _refresh_display_area(self, rectangle):
