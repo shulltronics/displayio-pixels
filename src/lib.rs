@@ -32,10 +32,10 @@ pub enum Orientation {
     LANDSCAPE,
 }
 
-#[pyclass]
+#[pyclass(unsendable)]
 pub struct PixelsDisplay {
     // window: Window,
-    // el: Arc<EventLoop<()>>,
+    el: EventLoop<()>,
     // underlying Framebuffer struct
     pixels: Pixels,
     // pixel width and height of screen
@@ -64,35 +64,35 @@ impl PixelsDisplay {
         let st = SurfaceTexture::new(width, height, &window);
         println!("created surface texture");
 
-        el.run(move |event, _, control_flow| {
-            control_flow.set_poll();
-            control_flow.set_wait();
+        // el.run(move |event, _, control_flow| {
+        //     control_flow.set_poll();
+        //     control_flow.set_wait();
 
-            match event {
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    window_id,
-                } if window_id == window.id() => control_flow.set_exit(),
-                Event::WindowEvent {
-                    event: WindowEvent::MouseInput {..},
-                    window_id,
-                } => {
-                    //log::debug!("{:?}", event);
-                    println!("{:?}", event);
-                },
-                Event::MainEventsCleared => {
-                    window.request_redraw();
-                },
-                Event::RedrawRequested(_) => {
-                    //canvas.
-                },
-                _ => (),
-            }
-        }); // event loop
+        //     match event {
+        //         Event::WindowEvent {
+        //             event: WindowEvent::CloseRequested,
+        //             window_id,
+        //         } if window_id == window.id() => control_flow.set_exit(),
+        //         Event::WindowEvent {
+        //             event: WindowEvent::MouseInput {..},
+        //             window_id,
+        //         } => {
+        //             //log::debug!("{:?}", event);
+        //             println!("{:?}", event);
+        //         },
+        //         Event::MainEventsCleared => {
+        //             window.request_redraw();
+        //         },
+        //         Event::RedrawRequested(_) => {
+        //             //canvas.
+        //         },
+        //         _ => (),
+        //     }
+        // }); // event loop
 
         Self {
             // window: window,
-            // el: Arc::new(el),
+            el: el,
             pixels: Pixels::new(width, height, st).unwrap(),
             width: width,
             height: height,
@@ -101,12 +101,13 @@ impl PixelsDisplay {
         }
     }
 
-    // pub fn run_event_loop(&mut self) {
-    //     self.el.take().unwrap().run_return(move |event, _, control_flow| {
-    //         control_flow.set_poll();
-    //         control_flow.set_wait();
-    //     });
-    // }
+    pub fn run_event_loop(&mut self) {
+        println!("run_event_loop");
+        self.el.run_return(move |event, _, control_flow| {
+            control_flow.set_poll();
+            control_flow.set_wait();
+        });
+    }
 
     pub fn get_orientation(&self) -> Orientation {
         return self.orientation;

@@ -9,6 +9,7 @@ import displayio
 from .displayio_pixels import Orientation
 
 from dataclasses import astuple
+import threading
 
 _INIT_SEQUENCE = None
 
@@ -17,10 +18,11 @@ class PixelsDisplay(displayio.Display):
     def __init__(self, width, height, **kwargs):
         self.running = True
         # construct the Rust object
-        self.pixels = displayio_pixels.PixelsDisplay(width, height)
+        self.local = threading.local()
+        self.local.pixels = displayio_pixels.PixelsDisplay(width, height)
         print("done with pixels")
-        #self.pixels.set_orientation(Orientation.LANDSCAPE)
-        (self._width, self._height) = self.pixels.get_size()
+        #self.local.pixels.set_orientation(Orientation.LANDSCAPE)
+        (self._width, self._height) = self.local.pixels.get_size()
         # initialize the super class, displayio.Display.
         super().__init__(None, _INIT_SEQUENCE, width=self._width, height=self._height, **kwargs)
         print("done with init")
@@ -58,7 +60,7 @@ class PixelsDisplay(displayio.Display):
 
             for area in self._subrectangles:
                 self._refresh_display_area(area)
-        self.pixels.run_event_loop()
+        self.local.pixels.run_event_loop()
 
 
     def _refresh_display_area(self, rectangle):
@@ -74,8 +76,8 @@ class PixelsDisplay(displayio.Display):
         # TODO --> write raw_str to the framebuffer,
         # probably with a method that can copy raw_str directly to the framebuffer
         # for (idx, px) in enumerate(raw_str):
-        #     self.pixels.set_pixel(idx, px)
-        self.pixels.write_bytes(raw_str)
+        #     self.local.pixels.set_pixel(idx, px)
+        self.local.pixels.write_bytes(raw_str)
 
     def get_mouse_clicks(self):
         event_return = None
@@ -85,11 +87,11 @@ class PixelsDisplay(displayio.Display):
 
     def set_orientation(self, o = 0):
         if o == 90:
-            self.pixels.set_orientation(Orientation.LANDSCAPE)
+            self.local.pixels.set_orientation(Orientation.LANDSCAPE)
             (self._width, self._height) = (self._height, self._width)
             # self._rotation = 90
         else:
-            self.pixels.set_orientation(Orientation.PORTRAIT)
+            self.local.pixels.set_orientation(Orientation.PORTRAIT)
             self._rotation = 0
 
     def quit(self):
