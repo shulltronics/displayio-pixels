@@ -18,19 +18,16 @@ class PixelsDisplay(displayio.Display):
         self.running = True
         # construct the Rust object
         self.pixels = displayio_pixels.PixelsDisplay(width, height)
-        self.pixels.set_pixel(0, 0xFFFFFFFF);
-        print("done with pixels")
         #self.pixels.set_orientation(Orientation.LANDSCAPE)
         (self._width, self._height) = self.pixels.get_size()
         # initialize the super class, displayio.Display.
         super().__init__(None, _INIT_SEQUENCE, width=self._width, height=self._height, **kwargs)
-        print("done with init")
 
     def _initialize(self, init_sequence):
         """ We have to override this method because we're not using an init sequence """
         pass
 
-    def refresh(self, *, target_frames_per_second=60, minimum_frames_per_second=1):
+    def refresh(self, *, target_frames_per_second=30, minimum_frames_per_second=1):
         """
         When auto refresh is off, waits for the target frame rate and then refreshes the
         display, returning True. If the call has taken too long since the last refresh call
@@ -47,13 +44,13 @@ class PixelsDisplay(displayio.Display):
             # Go through groups and and add each to buffer
             if self._core._current_group is not None:
                 buffer = Image.new("RGBA", (self._core._width, self._core._height))
+                print(type(buffer))
                 # Recursively have everything draw to the image
                 # pylint: disable=protected-access
-                self._core._current_group._fill_area(
-                    buffer
-                )  # pylint: disable=protected-access
+                self._core._current_group._fill_area(buffer)
+                # pylint: disable=protected-access
                 # save image to buffer (or probably refresh buffer so we can compare)
-                self._buffer.paste(buffer)
+                # self._buffer.paste(buffer)
 
             self._subrectangles = self._core.get_refresh_areas()
 
@@ -65,16 +62,7 @@ class PixelsDisplay(displayio.Display):
         """Loop through dirty rectangles and redraw that area."""
         # extract the dirty rectangle and convert it to RGBA format
         img = self._buffer.convert("RGBA").crop(astuple(rectangle))
-        # print("img size: {}".format(img.size))
-        # apply the rotations
-        # img = img.rotate(self._rotation, expand=True)
-        # display_rectangle = self._apply_rotation(rectangle)
-        # img = img.crop(astuple(self._clip(display_rectangle)))
         raw_str = img.tobytes("raw", "RGBA")
-        # TODO --> write raw_str to the framebuffer,
-        # probably with a method that can copy raw_str directly to the framebuffer
-        # for (idx, px) in enumerate(raw_str):
-        #     self.pixels.set_pixel(idx, px)
         self.pixels.write_bytes(raw_str)
 
     def get_mouse_clicks(self):

@@ -5,12 +5,13 @@ use embedded_graphics::{
     draw_target::DrawTarget,
 };
 
-use fltk::{app, draw, frame, prelude::*, window::Window};
+use fltk::{prelude::*, window::Window};
+use crate::renderer::NoiseRenderer;
+mod renderer;
 
 use pixels::{
     Pixels,
     SurfaceTexture,
-    wgpu::Color,
 };
 
 use pyo3::prelude::*;
@@ -27,6 +28,8 @@ pub enum Orientation {
 #[pyclass]
 pub struct PixelsDisplay {
     pixels: Pixels,
+    renderer: NoiseRenderer,
+    time: f32,
     width: u32,
     height: u32,
     orientation: Orientation,
@@ -37,7 +40,6 @@ impl PixelsDisplay {
     #[new]
     pub fn new(width: u32, height: u32) -> PixelsDisplay {
 
-        let app = app::App::default();
         let mut window = Window::default()
             .with_size(width as i32, height as i32)
             .with_label("Framebuffer");
@@ -51,8 +53,13 @@ impl PixelsDisplay {
         let st = SurfaceTexture::new(width, height, &window);
         println!("created surface texture");
 
+        let pixels = Pixels::new(width, height, st).unwrap();
+        let mut noise_renderer = NoiseRenderer::new(&pixels, width, height).unwrap();
+
         Self {
-            pixels: Pixels::new(width, height, st).unwrap(),
+            pixels: pixels,
+            renderer: noise_renderer,
+            time: 0.0,
             width: width,
             height: height,
             // start in PORTRAIT
@@ -95,7 +102,7 @@ impl PixelsDisplay {
 
     pub fn write_bytes(&mut self, bytes: &[u8]) {
         // Get both of the pixel buffers as 4 byte slices
-        let (_fb_prefix, fb_pixels, _fb_suffix) = unsafe { self.pixels.get_frame_mut().align_to_mut::<u32>() };
+        let (_fb_prefix, fb_pixels, _fb_suffix) = unsafe { self.pixels.frame_mut().align_to_mut::<u32>() };
         let (_circpy_prefix, circpy_pixels, _circpy_suffic) = unsafe {
             bytes.align_to::<u32>()
         };
@@ -118,11 +125,22 @@ impl PixelsDisplay {
                 fb_pixels[fb_idx] = circpy_pixels[circpy_idx];
             }            
         }
-        self.pixels.render();
+        //self.pixels.render();
+        let render_result = self.pixels.render_with(|encoder, render_target, context| {
+                let noise_texture = self.renderer.texture_view();
+                context.scaling_renderer.render(encoder, noise_texture);
+
+                self.renderer.update(&context.queue, self.time);
+                self.time += 0.01;
+
+                self.renderer.render(encoder, render_target, context.scaling_renderer.clip_rect());
+
+                Ok(())
+            });
     }
     
     pub fn set_pixel(&mut self, idx: usize, color: u32) {
-        let (_prefix, pixels, _suffix) = unsafe { self.pixels.get_frame_mut().align_to_mut::<u32>() };
+        let (_prefix, pixels, _suffix) = unsafe { self.pixels.frame_mut().align_to_mut::<u32>() };
         pixels[idx] = color;
         self.pixels.render();
     }
@@ -155,7 +173,7 @@ impl DrawTarget for PixelsDisplay {
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        let mut pxs = self.pixels.get_frame_mut();
+        let mut pxs = self.pixels.frame_mut();
         for Pixel(coord, color) in pixels.into_iter() {
             let (x, y) = (coord.x as u32, coord.y as u32);
             // constrain pixels to screen area
