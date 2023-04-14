@@ -5,12 +5,7 @@ use embedded_graphics::{
     draw_target::DrawTarget,
 };
 
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{EventLoop, ControlFlow},
-    window::{Window, WindowBuilder},
-    dpi::LogicalSize,
-};
+use fltk::{app, draw, frame, prelude::*, window::Window};
 
 use pixels::{
     Pixels,
@@ -31,13 +26,9 @@ pub enum Orientation {
 
 #[pyclass]
 pub struct PixelsDisplay {
-    //window: Window,
-    // underlying Framebuffer struct
     pixels: Pixels,
-    // pixel width and height of screen
     width: u32,
     height: u32,
-    // orientation of device
     orientation: Orientation,
 }
 
@@ -46,48 +37,21 @@ impl PixelsDisplay {
     #[new]
     pub fn new(width: u32, height: u32) -> PixelsDisplay {
 
-        let el = EventLoop::new();
-        println!("created event loop");
+        let app = app::App::default();
+        let mut window = Window::default()
+            .with_size(width as i32, height as i32)
+            .with_label("Framebuffer");
+        window.end();
+        window.make_resizable(false);
+        window.show();
 
-        let window = WindowBuilder::new()
-            .with_title("PixelsDisplay")
-            .with_inner_size(LogicalSize::new(width, height))
-            .build(&el)
-            .unwrap();
-        println!("fb width: {:?}", width);
-        println!("fb height: {:?}", height);
+        //println!("fb width: {:?}", width);
+        //println!("fb height: {:?}", height);
 
         let st = SurfaceTexture::new(width, height, &window);
         println!("created surface texture");
 
-        el.run(move |event, _, control_flow| {
-            control_flow.set_poll();
-            control_flow.set_wait();
-
-            match event {
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    window_id,
-                } if window_id == window.id() => control_flow.set_exit(),
-                Event::WindowEvent {
-                    event: WindowEvent::MouseInput {..},
-                    window_id,
-                } => {
-                    //log::debug!("{:?}", event);
-                    println!("{:?}", event);
-                },
-                Event::MainEventsCleared => {
-                    window.request_redraw();
-                },
-                Event::RedrawRequested(_) => {
-                    //canvas.
-                },
-                _ => (),
-            }
-        }); // event loop
-
         Self {
-            //window: window,
             pixels: Pixels::new(width, height, st).unwrap(),
             width: width,
             height: height,
@@ -141,24 +105,27 @@ impl PixelsDisplay {
         for x in 0..self.width-1 {
             for y in 0..self.height-1 {
                 let circpy_idx = (x + y*self.width) as usize;
-                // Get the index into the framebuffer (accounting for hidden indexes)
-                let fb_idx: usize = match self.orientation {
-                    Orientation::PORTRAIT => {
-                        (x + y*(BYTES_PER_PIXEL as u32)) as usize
-                    },
-                    Orientation::LANDSCAPE => {
-                        ((self.height - 1 - y) + x*(BYTES_PER_PIXEL as u32)) as usize
-                    },
-                };
+                // Get the index into the framebuffer
+                let fb_idx: usize = circpy_idx;
+                //let fb_idx: usize = match self.orientation {
+                //    Orientation::PORTRAIT => {
+                //        (x + y*(BYTES_PER_PIXEL as u32)) as usize
+                //    },
+                //    Orientation::LANDSCAPE => {
+                //        ((self.height - 1 - y) + x*(BYTES_PER_PIXEL as u32)) as usize
+                //    },
+                //};
                 fb_pixels[fb_idx] = circpy_pixels[circpy_idx];
             }            
         }
+        self.pixels.render();
     }
-    //
-    //pub fn set_pixel(&mut self, idx: usize, color: u32) {
-    //    let (_prefix, pixels, _suffix) = unsafe { self.fb.frame.align_to_mut::<u32>() };
-    //    pixels[idx] = color;
-    //}
+    
+    pub fn set_pixel(&mut self, idx: usize, color: u32) {
+        let (_prefix, pixels, _suffix) = unsafe { self.pixels.get_frame_mut().align_to_mut::<u32>() };
+        pixels[idx] = color;
+        self.pixels.render();
+    }
 
 }
 

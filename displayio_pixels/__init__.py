@@ -18,6 +18,7 @@ class PixelsDisplay(displayio.Display):
         self.running = True
         # construct the Rust object
         self.pixels = displayio_pixels.PixelsDisplay(width, height)
+        self.pixels.set_pixel(0, 0xFFFFFFFF);
         print("done with pixels")
         #self.pixels.set_orientation(Orientation.LANDSCAPE)
         (self._width, self._height) = self.pixels.get_size()
