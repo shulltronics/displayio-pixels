@@ -44,7 +44,6 @@ class PixelsDisplay(displayio.Display):
             # Go through groups and and add each to buffer
             if self._core._current_group is not None:
                 buffer = Image.new("RGBA", (self._core._width, self._core._height))
-                print(type(buffer))
                 # Recursively have everything draw to the image
                 # pylint: disable=protected-access
                 self._core._current_group._fill_area(buffer)

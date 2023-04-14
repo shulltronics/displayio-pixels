@@ -5,7 +5,7 @@ use embedded_graphics::{
     draw_target::DrawTarget,
 };
 
-use fltk::{prelude::*, window::Window};
+use fltk::{app, prelude::*, window::Window};
 use crate::renderer::NoiseRenderer;
 mod renderer;
 
@@ -15,6 +15,7 @@ use pixels::{
 };
 
 use pyo3::prelude::*;
+use std::{cell::RefCell, rc::Rc};
 
 const BYTES_PER_PIXEL: usize = 4;
 
@@ -27,6 +28,7 @@ pub enum Orientation {
 
 #[pyclass]
 pub struct PixelsDisplay {
+    // app: app::App,
     pixels: Pixels,
     renderer: NoiseRenderer,
     time: f32,
@@ -40,23 +42,39 @@ impl PixelsDisplay {
     #[new]
     pub fn new(width: u32, height: u32) -> PixelsDisplay {
 
+        let app = app::App::default();
         let mut window = Window::default()
             .with_size(width as i32, height as i32)
             .with_label("Framebuffer");
         window.end();
-        window.make_resizable(false);
+        window.make_resizable(true);
         window.show();
-
-        //println!("fb width: {:?}", width);
-        //println!("fb height: {:?}", height);
 
         let st = SurfaceTexture::new(width, height, &window);
         println!("created surface texture");
 
-        let pixels = Pixels::new(width, height, st).unwrap();
+        let mut pixels = Pixels::new(width, height, st).unwrap();
         let mut noise_renderer = NoiseRenderer::new(&pixels, width, height).unwrap();
 
+        // Handle resize events
+        let surface_size = Rc::new(RefCell::new(None));
+        let surface_resize = surface_size.clone();
+        window.resize_callback(move |window, _x, _y, width, height| {
+            let scale_factor = window.pixels_per_unit();
+            let width = (width as f32 * scale_factor) as u32;
+            let height = (height as f32 * scale_factor) as u32;
+            surface_resize.borrow_mut().replace((width, height));
+        });
+
+        // app.run().unwrap();
+        std::thread::spawn(move || {
+            while app.wait() {
+                println!("app.wait()");
+            }
+        });
+
         Self {
+            // app: app,
             pixels: pixels,
             renderer: noise_renderer,
             time: 0.0,
@@ -125,18 +143,23 @@ impl PixelsDisplay {
                 fb_pixels[fb_idx] = circpy_pixels[circpy_idx];
             }            
         }
-        //self.pixels.render();
-        let render_result = self.pixels.render_with(|encoder, render_target, context| {
-                let noise_texture = self.renderer.texture_view();
-                context.scaling_renderer.render(encoder, noise_texture);
+        // if self.app.wait() {
+        //     // println!("app.wait() returned true!");
+        //     // app::flush();
+        //     app::awake();
+        // }
+        self.pixels.render();
+        // let render_result = self.pixels.render_with(|encoder, render_target, context| {
+        //         let noise_texture = self.renderer.texture_view();
+        //         context.scaling_renderer.render(encoder, noise_texture);
 
-                self.renderer.update(&context.queue, self.time);
-                self.time += 0.01;
+        //         self.renderer.update(&context.queue, self.time);
+        //         self.time += 0.01;
 
-                self.renderer.render(encoder, render_target, context.scaling_renderer.clip_rect());
+        //         self.renderer.render(encoder, render_target, context.scaling_renderer.clip_rect());
 
-                Ok(())
-            });
+        //         Ok(())
+        //     });
     }
     
     pub fn set_pixel(&mut self, idx: usize, color: u32) {
