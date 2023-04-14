@@ -50,7 +50,7 @@ class PixelsDisplay(displayio.Display):
                 self._core._current_group._fill_area(buffer)
                 # pylint: disable=protected-access
                 # save image to buffer (or probably refresh buffer so we can compare)
-                # self._buffer.paste(buffer)
+                self._buffer.paste(buffer)
 
             self._subrectangles = self._core.get_refresh_areas()
 
