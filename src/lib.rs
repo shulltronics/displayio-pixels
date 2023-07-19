@@ -10,6 +10,7 @@ use winit::{
     event_loop::{EventLoop, ControlFlow},
     window::{Window, WindowBuilder},
     dpi::LogicalSize,
+    platform::run_return::EventLoopExtRunReturn,
 };
 
 use pixels::{
@@ -29,11 +30,13 @@ pub enum Orientation {
     LANDSCAPE,
 }
 
+static mut EVENT_LOOP: Option<EventLoop<()>> = None;
+
 #[pyclass]
 pub struct PixelsDisplay {
-    //window: Window,
+    window: Window,
     // underlying Framebuffer struct
-    pixels: Pixels,
+    // pixels: Pixels,
     // pixel width and height of screen
     width: u32,
     height: u32,
@@ -46,7 +49,7 @@ impl PixelsDisplay {
     #[new]
     pub fn new(width: u32, height: u32) -> PixelsDisplay {
 
-        let el = EventLoop::new();
+        let mut el = EventLoop::new();
         println!("created event loop");
 
         let window = WindowBuilder::new()
@@ -57,38 +60,11 @@ impl PixelsDisplay {
         println!("fb width: {:?}", width);
         println!("fb height: {:?}", height);
 
-        let st = SurfaceTexture::new(width, height, &window);
-        println!("created surface texture");
-
-        el.run(move |event, _, control_flow| {
-            control_flow.set_poll();
-            control_flow.set_wait();
-
-            match event {
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    window_id,
-                } if window_id == window.id() => control_flow.set_exit(),
-                Event::WindowEvent {
-                    event: WindowEvent::MouseInput {..},
-                    window_id,
-                } => {
-                    //log::debug!("{:?}", event);
-                    println!("{:?}", event);
-                },
-                Event::MainEventsCleared => {
-                    window.request_redraw();
-                },
-                Event::RedrawRequested(_) => {
-                    //canvas.
-                },
-                _ => (),
-            }
-        }); // event loop
+        unsafe { EVENT_LOOP = Some(el); }
 
         Self {
-            //window: window,
-            pixels: Pixels::new(width, height, st).unwrap(),
+            window: window,
+            // pixels: 
             width: width,
             height: height,
             // start in PORTRAIT
@@ -129,9 +105,47 @@ impl PixelsDisplay {
     //    }
     //}
 
+    fn run_event_loop(&mut self) {
+        println!("in run_event_loop");
+        let mut el = unsafe {
+            EVENT_LOOP.take().unwrap()
+        };
+        el.run_return(|event, _, control_flow| {
+            // control_flow.set_poll();
+            control_flow.set_wait();
+            // control_flow.set_exit();
+            println!("control flow at start is: {:?}", control_flow);
+
+            match event {
+                Event::WindowEvent {
+                    event: WindowEvent::MouseInput {..},
+                    window_id,
+                } => {
+                    //log::debug!("{:?}", event);
+                    println!("{:?}", event);
+                },
+                Event::MainEventsCleared => {
+                    control_flow.set_exit();
+                },
+                Event::RedrawRequested(_) => {
+                    // self.window.request_redraw();
+                    self.write_bytes(&[0]);
+                },
+                _ => (),
+            }
+            println!("control flow at end is: {:?}", control_flow);
+        }); // event loop
+        println!("leaving run_event_loop");
+        unsafe { EVENT_LOOP = Some(el); }
+    }
+
     pub fn write_bytes(&mut self, bytes: &[u8]) {
+        self.run_event_loop();
+        let st = SurfaceTexture::new(self.width, self.height, &self.window);
+        let mut px = Pixels::new(self.width, self.height, st).unwrap();
+        // println!("created surface texture");
         // Get both of the pixel buffers as 4 byte slices
-        let (_fb_prefix, fb_pixels, _fb_suffix) = unsafe { self.pixels.get_frame_mut().align_to_mut::<u32>() };
+        let (_fb_prefix, fb_pixels, _fb_suffix) = unsafe { px.get_frame_mut().align_to_mut::<u32>() };
         let (_circpy_prefix, circpy_pixels, _circpy_suffic) = unsafe {
             bytes.align_to::<u32>()
         };
@@ -188,7 +202,9 @@ impl DrawTarget for PixelsDisplay {
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        let mut pxs = self.pixels.get_frame_mut();
+        let st = SurfaceTexture::new(self.width, self.height, &self.window);
+        let mut px = Pixels::new(self.width, self.height, st).unwrap();
+        let pxs = px.get_frame_mut();
         for Pixel(coord, color) in pixels.into_iter() {
             let (x, y) = (coord.x as u32, coord.y as u32);
             // constrain pixels to screen area
